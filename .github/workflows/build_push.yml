@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: main
-          token: ${{ secrets.BOT_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Find lib changes
         id: modified-libs
@@ -39,14 +39,6 @@ jobs:
           files_ignore: lib/**.md
           files_separator: " "
           safe_output: false
-
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v6  # v6.1.0
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
 
       #   # This step is going to commit, but this will not trigger another workflow.
       # - name: Bump extensions that uses a modified lib
@@ -111,7 +103,6 @@ jobs:
 
       - name: Upload APKs (chunk ${{ matrix.chunk }})
         uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4
-        if: github.repository == 'aniku-app/aniku-extensions'
         with:
           name: "individual-apks-${{ matrix.chunk }}"
           path: "**/*.apk"
@@ -124,7 +115,6 @@ jobs:
     name: Publish repo
     needs:
       - build_individual
-    if: github.repository == 'aniku-app/aniku-extensions'
     runs-on: ubuntu-latest
     steps:
       - name: Download APK artifacts
@@ -156,36 +146,16 @@ jobs:
       - name: Checkout repo branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
-          repository: aniku-app/extensions
-          token: ${{ secrets.BOT_PAT }}
-          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: repo
           path: repo
 
       - name: Sync repo
         run: |
           rsync -a --delete --exclude .git --exclude .gitignore main/repo/ repo --exclude README.md --exclude repo.json
 
-      - name: Import GPG key
-        id: import-gpg
-        uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5 # v6
-        with:
-          workdir: repo
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-
-      - name: GPG user IDs
-        run: |
-          echo "fingerprint: ${{ steps.import-gpg.outputs.fingerprint }}"
-          echo "keyid:       ${{ steps.import-gpg.outputs.keyid }}"
-          echo "name:        ${{ steps.import-gpg.outputs.name }}"
-          echo "email:       ${{ steps.import-gpg.outputs.email }}"
-
       - name: Deploy repo
         uses: EndBug/add-and-commit@v9
         with:
           message: "Update extensions repo"
           cwd: "./repo"
-          committer_name: ${{ steps.import-gpg.outputs.name }}
-          committer_email: ${{ steps.import-gpg.outputs.email }}
